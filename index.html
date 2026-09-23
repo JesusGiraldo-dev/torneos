@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brawlhalla Tournament Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brawl: {
+                            gold: '#fbbf24',
+                            cyan: '#06b6d4',
+                            red: '#ef4444',
+                            dark: '#0f172a',
+                            card: '#1e293b',
+                            accent: '#f59e0b',
+                            purple: '#a855f7'
+                        }
+                    },
+                    fontFamily: {
+                        teko: ['Teko', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+
+        .bracket-scroll::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .bracket-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .bracket-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        .bracket-scroll::-webkit-scrollbar-thumb:hover {
+            background: #f59e0b;
+        }
+
+        .glow-gold {
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.25);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+        }
+        .tab-btn.active {
+            border-color: #f59e0b;
+            color: #fbbf24;
+            background-color: rgba(245, 158, 11, 0.1);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased flex flex-col min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            
+            <!-- Brand / Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('events')">
+                <div class="bg-gradient-to-tr from-amber-500 to-yellow-300 p-2 rounded-xl text-slate-950 font-black text-2xl shadow-lg">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <div>
+                    <h1 class="font-teko text-3xl tracking-wide uppercase text-amber-400 leading-none">Brawlhalla Arena</h1>
+                    <p class="text-xs text-slate-400">Plataforma de Torneos & Brackets en Vivo</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+                <button onclick="switchTab('events')" id="nav-events" class="tab-btn active px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-amber-400 transition flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-days"></i> Eventos
+                </button>
+                <button onclick="switchTab('bracket')" id="nav-bracket" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-amber-400 transition flex items-center gap-2">
+                    <i class="fa-solid fa-sitemap"></i> Bracket en Vivo
+                </button>
+                <button onclick="switchTab('leaderboard')" id="nav-leaderboard" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-amber-400 transition flex items-center gap-2">
+                    <i class="fa-solid fa-ranking-star"></i> Clasificación
+                </button>
+                <button onclick="switchTab('admin')" id="nav-admin" class="tab-btn hidden px-3.5 py-1.5 rounded-lg text-xs font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved"></i> Panel Admin
+                </button>
+            </nav>
+
+            <!-- User Auth Bar -->
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+                <div id="authArea" class="flex items-center gap-2 text-xs">
+                    <button onclick="openAuthModal()" id="btnOpenAuth" class="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition">
+                        <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+                    </button>
+                    
+                    <div id="userChip" class="hidden items-center gap-2">
+                        <div class="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                            <span id="userRoleBadge" class="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-slate-300">Usuario</span>
+                            <button onclick="openMyProfile()" class="text-left hover:text-amber-400 transition" title="Editar mi perfil">
+                                <span id="userChipName" class="font-bold text-slate-100 text-xs block"></span>
+                                <span id="userChipElo" class="text-[10px] text-amber-400 block"></span>
+                            </button>
+                        </div>
+                        <button onclick="logoutUser()" class="px-3 py-2 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-400 rounded-xl font-bold transition" title="Cerrar sesión">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1 border-l border-slate-800 pl-2">
+                    <button onclick="exportJSON()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition" title="Guardar copia local">
+                        <i class="fa-solid fa-download"></i> <span class="hidden sm:inline">Backup</span>
+                    </button>
+                    <button onclick="importJSON()" id="btnImportBackup" class="hidden px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition" title="Cargar copia local">
+                        <i class="fa-solid fa-upload"></i> <span class="hidden sm:inline">Cargar</span>
+                    </button>
+                    <input type="file" id="importInput" class="hidden" accept=".json" onchange="handleFileImport(event)">
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col gap-6">
+
+        <!-- SECTION: EVENTOS TAB -->
+        <section id="section-events" class="space-y-4">
+            <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <div>
+                        <h2 class="font-teko text-3xl text-amber-400 flex items-center gap-2 leading-none">
+                            <i class="fa-solid fa-calendar-days text-xl"></i> Torneos & Eventos
+                        </h2>
+                        <p class="text-xs text-slate-400">Inscríbete en los torneos disponibles o gestiona tus eventos.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="btnCreateEvent" onclick="openCreateEventModal()" class="hidden bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs shadow-lg transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Crear Nuevo Evento
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Events List Container -->
+                <div id="eventsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <p class="text-xs text-slate-500 col-span-full text-center py-8">Cargando eventos...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: BRACKET TAB -->
+        <section id="section-bracket" class="hidden space-y-6">
+            
+            <!-- Bracket Info / Generator Banner -->
+            <div id="bracketInfoBox" class="w-full bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+                <div>
+                    <div class="flex justify-between items-start mb-4 flex-wrap gap-3">
+                        <div>
+                            <h3 id="currentEventTitle" class="font-teko text-3xl text-amber-400 leading-none">Torneo General</h3>
+                            <p id="bracketRoleHint" class="text-xs text-slate-400">Visualiza los resultados en tiempo real.</p>
+                        </div>
+                        <div id="bracketAdminActions" class="hidden flex gap-2 flex-wrap">
+                            <button id="btnStartTournamentAction" onclick="openStartTournamentModal()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs shadow-lg transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-rocket"></i> 🚀 INICIAR TORNEO
+                            </button>
+                            <button onclick="resetBracket()" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/50 px-3 py-2 rounded-xl text-xs font-bold transition" title="Reiniciar resultados">
+                                <i class="fa-solid fa-rotate-left"></i> Reiniciar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stats Display -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center my-2">
+                        <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-xl">
+                            <span class="block text-xs text-slate-400">Inscritos del Evento</span>
+                            <span id="statPlayers" class="font-teko text-2xl text-slate-100">0</span>
+                        </div>
+                        <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-xl">
+                            <span class="block text-xs text-slate-400">Pases Libres (Byes)</span>
+                            <span id="statByes" class="font-teko text-2xl text-amber-400">0</span>
+                        </div>
+                        <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-xl">
+                            <span class="block text-xs text-slate-400">Total Rondas</span>
+                            <span id="statRounds" class="font-teko text-2xl text-cyan-400">0</span>
+                        </div>
+                        <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-xl">
+                            <span class="block text-xs text-slate-400">Estado</span>
+                            <span id="statStatus" class="font-teko text-xl text-emerald-400">Esperando</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Champion Banner -->
+                <div id="championBanner" class="hidden bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-500/50 rounded-xl p-4 text-center animate-pulse mt-2">
+                    <span class="text-xs uppercase tracking-widest text-amber-400 font-bold block mb-1">🏆 CAMPEÓN DEL TORNEO 🏆</span>
+                    <span id="championName" class="font-teko text-4xl text-amber-300 font-bold tracking-wider"></span>
+                </div>
+            </div>
+
+            <!-- Bracket Canvas Container -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-2xl flex flex-col overflow-hidden">
+                <div id="bracketContainer" class="bracket-scroll overflow-x-auto overflow-y-auto p-4 min-h-[440px] flex items-center justify-center">
+                    <div class="text-center text-slate-500">
+                        <i class="fa-solid fa-trophy text-5xl mb-3 opacity-30"></i>
+                        <p class="text-sm">No hay un torneo activo en este momento.</p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- SECTION: CLASIFICACION (LEADERBOARD) TAB -->
+        <section id="section-leaderboard" class="hidden space-y-4">
+            <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <div>
+                        <h2 class="font-teko text-3xl text-amber-400 flex items-center gap-2 leading-none">
+                            <i class="fa-solid fa-ranking-star text-xl"></i> Tabla de Clasificación General
+                        </h2>
+                        <p class="text-xs text-slate-400">Ranking global de jugadores ordenado por ELO de Brawlhalla.</p>
+                    </div>
+                    <div class="w-full sm:w-64">
+                        <input type="text" id="searchLeaderboard" placeholder="Buscar jugador..." 
+                            onkeyup="renderLeaderboard()"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="text-slate-400 border-b border-slate-700 bg-slate-900/50">
+                            <tr>
+                                <th class="p-3">#</th>
+                                <th class="p-3">Nick Brawlhalla</th>
+                                <th class="p-3">Usuario</th>
+                                <th class="p-3">ELO</th>
+                                <th class="p-3">Rango</th>
+                                <th class="p-3">Rol</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardTbody">
+                            <tr><td colspan="6" class="text-center p-4 text-slate-500">Cargando clasificación...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: PANEL ADMIN TAB -->
+        <section id="section-admin" class="hidden space-y-6">
+            <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-xl space-y-6">
+                
+                <div class="flex items-center justify-between border-b border-slate-700 pb-3 flex-wrap gap-2">
+                    <div>
+                        <h2 class="font-teko text-3xl text-amber-400 flex items-center gap-2 leading-none">
+                            <i class="fa-solid fa-shield-halved text-xl"></i> Panel de Administración del Sistema
+                        </h2>
+                        <p class="text-xs text-slate-400">Gestiona usuarios, asigna roles de Owner/Partner o Admin y ajusta ELOs.</p>
+                    </div>
+                </div>
+
+                <!-- User Management Table -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-200 mb-3">Gestión de Usuarios</h3>
+                    <p class="text-[11px] text-slate-400 mb-3">Edita el nick, la leyenda, el ELO, el rango o el rol de cualquier jugador y guarda los cambios con el ícono de disquete. Los <strong>Owners / Partners</strong> pueden crear eventos, iniciar torneos y cargar resultados; los <strong>Administradores</strong> tienen acceso total, incluyendo este panel.</p>
+                    <div class="overflow-x-auto border border-slate-700/60 rounded-xl">
+                        <table class="w-full text-xs text-left">
+                            <thead class="text-slate-400 border-b border-slate-700 bg-slate-900">
+                                <tr>
+                                    <th class="p-3">Nick Brawlhalla</th>
+                                    <th class="p-3">Usuario (Login)</th>
+                                    <th class="p-3">Leyenda</th>
+                                    <th class="p-3">ELO</th>
+                                    <th class="p-3">Rango</th>
+                                    <th class="p-3">Rol del Usuario</th>
+                                    <th class="p-3 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminUsersList">
+                                <tr><td colspan="7" class="text-center p-4 text-slate-500">Cargando usuarios...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-950/80 text-center py-4 text-xs text-slate-500 mt-auto">
+        <p>Brawlhalla Arena — Sistema de Gestión de Torneos y Brackets</p>
+    </footer>
+
+    <!-- MODAL: MANUAL MATCH EDIT (ORGANIZERS / ADMINS) -->
+    <div id="editModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="font-teko text-2xl text-amber-400 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i> Editar Enfrentamiento
+            </h3>
+            
+            <div class="space-y-4">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700">
+                    <label class="block text-xs text-slate-400 mb-1">Jugador 1</label>
+                    <input type="text" id="modalP1Name" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 font-semibold mb-2">
+                    <label class="block text-xs text-slate-400 mb-1">Marcador / Puntaje</label>
+                    <input type="number" id="modalP1Score" min="0" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100">
+                </div>
+
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700">
+                    <label class="block text-xs text-slate-400 mb-1">Jugador 2</label>
+                    <input type="text" id="modalP2Name" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 font-semibold mb-2">
+                    <label class="block text-xs text-slate-400 mb-1">Marcador / Puntaje</label>
+                    <input type="number" id="modalP2Score" min="0" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="saveMatchEdit()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: AUTHENTICATION (LOGIN / REGISTER) -->
+    <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="authModalTitle" class="font-teko text-3xl text-amber-400 leading-none">Iniciar Sesión</h3>
+                <button onclick="closeAuthModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div id="authError" class="hidden text-xs text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 mb-3"></div>
+
+            <div class="space-y-3 mb-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Nombre de Usuario</label>
+                    <input type="text" id="authUsername" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div id="registerFields" class="hidden space-y-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Nick en Brawlhalla</label>
+                        <input type="text" id="regNick" placeholder="Ejemplo: Player#1234" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="w-1/2">
+                            <label class="block text-xs text-slate-400 mb-1">ELO Inicial</label>
+                            <input type="number" id="regElo" value="1200" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="block text-xs text-slate-400 mb-1">Rango</label>
+                            <select id="regRank" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+                                <option>Tin</option><option>Bronze</option><option>Silver</option>
+                                <option selected>Gold</option><option>Platinum</option><option>Diamond</option><option>Valhallan</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Contraseña</label>
+                    <div class="relative">
+                        <input type="password" id="authPassword" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 pr-10 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                        <button type="button" onclick="toggleAuthPasswordVisibility()" tabindex="-1" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-amber-400">
+                            <i class="fa-solid fa-eye" id="authPasswordEyeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="btnAuthSubmit" onclick="submitAuth()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black py-2.5 rounded-xl text-sm transition shadow-lg mb-3">Entrar</button>
+
+            <div class="flex justify-between items-center text-xs text-slate-400">
+                <button onclick="toggleAuthMode()" id="btnToggleAuthMode" class="hover:text-amber-400 font-semibold">¿No tienes cuenta? Regístrate</button>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-3 leading-relaxed border-t border-slate-700/60 pt-2">
+                Sesión persistente activada: El navegador recordará tu cuenta. Si olvidaste tu contraseña, la administración puede vincular tu nuevo usuario.
+            </p>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT MY PROFILE & SETTINGS -->
+    <div id="myProfileModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <div>
+                    <h3 class="font-teko text-3xl text-amber-400 leading-none">Mi Perfil & Configuración</h3>
+                    <p class="text-xs text-slate-400">Ajusta tus datos de juego y opciones de seguridad.</p>
+                </div>
+                <button onclick="closeMyProfile()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Status alert inside modal -->
+            <div id="profStatusMsg" class="hidden text-xs rounded-lg p-2.5"></div>
+
+            <!-- Section 1: Data Game -->
+            <div class="bg-slate-900/60 border border-slate-700/60 rounded-xl p-3.5 space-y-3">
+                <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <i class="fa-solid fa-gamepad"></i> Datos de Juego
+                </h4>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Nick en Brawlhalla</label>
+                    <input type="text" id="profNick" placeholder="Nick en Brawlhalla" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/2">
+                        <label class="block text-xs text-slate-400 mb-1">ELO Actual</label>
+                        <input type="number" id="profElo" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-xs text-slate-400 mb-1">Rango</label>
+                        <select id="profRank" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+                            <option>Tin</option><option>Bronze</option><option>Silver</option>
+                            <option>Gold</option><option>Platinum</option><option>Diamond</option><option>Valhallan</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Leyenda Principal (Main)</label>
+                    <input type="text" id="profLegend" placeholder="Ej. Bodvar, Orion, Mordex, Nix..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                </div>
+                <button onclick="saveMyProfile()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-lg text-xs transition">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios del Perfil
+                </button>
+            </div>
+
+            <!-- Section 2: Security & Password -->
+            <div class="bg-slate-900/60 border border-slate-700/60 rounded-xl p-3.5 space-y-3">
+                <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <i class="fa-solid fa-lock"></i> Seguridad (Cambiar Contraseña)
+                </h4>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Nueva Contraseña</label>
+                    <input type="password" id="profNewPass" placeholder="Mínimo 6 caracteres" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-400">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Confirmar Nueva Contraseña</label>
+                    <input type="password" id="profConfirmPass" placeholder="Repite la contraseña" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-400">
+                </div>
+                <button onclick="changeMyPassword()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded-lg text-xs transition">
+                    <i class="fa-solid fa-key"></i> Actualizar Contraseña
+                </button>
+            </div>
+
+            <!-- Section 3: Account Info -->
+            <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-3 text-xs text-slate-400 space-y-1">
+                <p><strong class="text-slate-300">Usuario Login:</strong> <span id="profInfoUsername">-</span></p>
+                <p><strong class="text-slate-300">Rol de Cuenta:</strong> <span id="profInfoRole" class="font-bold text-amber-400">-</span></p>
+                <p class="text-[10px] text-slate-500 break-all"><strong class="text-slate-400">UID Firebase:</strong> <span id="profInfoUid">-</span></p>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeMyProfile()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs font-bold">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CREATE / EDIT EVENT -->
+    <div id="eventModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="font-teko text-3xl text-amber-400 mb-4 leading-none">Crear Evento / Torneo</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Título del evento</label>
+                    <input type="text" id="evTitle" placeholder="Ej. Torneo Apertura Brawlhalla 1v1" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/2">
+                        <label class="block text-xs text-slate-400 mb-1">Formato de Juego</label>
+                        <select id="evType" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+                            <option value="1v1">1v1 Individual</option>
+                            <option value="2v2">Dúos (2v2)</option>
+                            <option value="3v3">Tríos (3v3)</option>
+                            <option value="ffa">Todos contra todos (FFA)</option>
+                        </select>
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-xs text-slate-400 mb-1">Premio / Prize Pool</label>
+                        <input type="text" id="evPrize" placeholder="Ej. $50 USD / Puntos" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Reglas / Descripción</label>
+                    <textarea id="evDescription" placeholder="Ej. Best of 3, mapas oficiales, lobby sin handicap." rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400"></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/2">
+                        <label class="block text-xs text-slate-400 mb-1">Fecha de inicio</label>
+                        <input type="date" id="evStartDate" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-xs text-slate-400 mb-1">Duración (días)</label>
+                        <input type="number" id="evDuration" value="1" min="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-5">
+                <button onclick="closeCreateEventModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="saveEvent()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold">Guardar Evento</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT CORE: BRACKET ENGINE & TAB NAVIGATION -->
+    <script>
+        // Global State Variables
+        let players = [];
+        let tournament = null;
+        let editingMatchRef = null;
+        let currentEventId = null;
+
+        // Navigation Tab Switching
+        function switchTab(tabName) {
+            const tabs = ['events', 'bracket', 'leaderboard', 'admin'];
+            tabs.forEach(t => {
+                const section = document.getElementById(`section-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                if (section) section.classList.toggle('hidden', t !== tabName);
+                if (nav) nav.classList.toggle('active', t === tabName);
+            });
+            if (tabName === 'leaderboard') renderLeaderboard();
+            if (tabName === 'admin' && window.renderAdminPanel) window.renderAdminPanel();
+        }
+
+        window.onload = function() {
+            loadFromLocalStorage();
+            updatePlayerList();
+        };
+
+        function updatePlayerList() {
+            const statPlayers = document.getElementById('statPlayers');
+            if (statPlayers) statPlayers.innerText = players.length;
+        }
+
+        // --- BRACKET ALGORITHM ---
+        // El bracket ya NO se arma a mano: se genera automáticamente a partir de los
+        // inscritos de un evento cuando el organizador pulsa "Iniciar Torneo" (ver
+        // startTournamentFromEvent en el bloque de Firebase más abajo).
+
+        // Orden de siembra estándar de brackets (1 vs N, 2 vs N-1, 4 vs 5, etc.)
+        // Reparte los BYE por todo el árbol en vez de amontonarlos en los últimos
+        // enfrentamientos, que es lo que pasaba antes al simplemente rellenar al final.
+        function seedOrder(n) {
+            if (n === 1) return [1];
+            const prev = seedOrder(n / 2);
+            const result = [];
+            prev.forEach(s => {
+                result.push(s);
+                result.push(n + 1 - s);
+            });
+            return result;
+        }
+
+        function generateBracket() {
+            if (!window.canManage) { alert('Solo los organizadores o administradores pueden iniciar el torneo.'); return; }
+            if (players.length < 2) {
+                alert('El evento necesita al menos 2 inscritos para iniciar el torneo.');
+                return;
+            }
+
+            const numPlayers = players.length;
+            const bracketSize = Math.pow(2, Math.ceil(Math.log2(numPlayers)));
+            const numByes = bracketSize - numPlayers;
+            const totalRounds = Math.log2(bracketSize);
+
+            document.getElementById('statByes').innerText = numByes;
+            document.getElementById('statRounds').innerText = totalRounds;
+            document.getElementById('statStatus').innerText = 'En Juego';
+
+            let rounds = [];
+            let round1 = [];
+
+            // players ya viene ordenado por ELO (seed 1 = mejor ELO). Los seeds que
+            // sobran del tamaño del bracket (numPlayers+1 .. bracketSize) son BYE, y
+            // seedOrder() decide en qué enfrentamiento cae cada seed.
+            const order = seedOrder(bracketSize);
+            const seededList = order.map(seed => seed <= numPlayers ? players[seed - 1] : 'BYE (Pase Libre)');
+
+            for (let i = 0; i < bracketSize; i += 2) {
+                const p1 = seededList[i];
+                const p2 = seededList[i + 1];
+                
+                let match = {
+                    id: `R1-M${i/2}`,
+                    round: 0,
+                    matchIndex: i/2,
+                    p1: { name: p1, score: 0 },
+                    p2: { name: p2, score: 0 },
+                    winner: null
+                };
+
+                if (p2 === 'BYE (Pase Libre)') {
+                    match.winner = p1;
+                    match.p1.score = 2;
+                    match.p2.score = 0;
+                } else if (p1 === 'BYE (Pase Libre)') {
+                    match.winner = p2;
+                    match.p1.score = 0;
+                    match.p2.score = 2;
+                }
+
+                round1.push(match);
+            }
+
+            rounds.push(round1);
+
+            for (let r = 1; r < totalRounds; r++) {
+                let matchCount = bracketSize / Math.pow(2, r + 1);
+                let roundMatches = [];
+                for (let m = 0; m < matchCount; m++) {
+                    roundMatches.push({
+                        id: `R${r+1}-M${m}`,
+                        round: r,
+                        matchIndex: m,
+                        p1: { name: 'TBD', score: 0 },
+                        p2: { name: 'TBD', score: 0 },
+                        winner: null
+                    });
+                }
+                rounds.push(roundMatches);
+            }
+
+            tournament = {
+                bracketSize: bracketSize,
+                totalRounds: totalRounds,
+                rounds: rounds,
+                champion: null
+            };
+
+            propagateWinners();
+            renderBracket();
+            saveToLocalStorage();
+        }
+
+        function propagateWinners() {
+            if (!tournament) return;
+
+            for (let r = 0; r < tournament.rounds.length - 1; r++) {
+                const currentRound = tournament.rounds[r];
+                const nextRound = tournament.rounds[r + 1];
+
+                for (let m = 0; m < currentRound.length; m++) {
+                    const match = currentRound[m];
+                    const nextMatchIndex = Math.floor(m / 2);
+                    const isFirstSlot = m % 2 === 0;
+
+                    if (match.winner) {
+                        if (isFirstSlot) {
+                            nextRound[nextMatchIndex].p1.name = match.winner;
+                        } else {
+                            nextRound[nextMatchIndex].p2.name = match.winner;
+                        }
+                    }
+                }
+            }
+
+            const finalRound = tournament.rounds[tournament.rounds.length - 1];
+            if (finalRound && finalRound[0] && finalRound[0].winner) {
+                tournament.champion = finalRound[0].winner;
+            } else {
+                tournament.champion = null;
+            }
+
+            updateChampionUI();
+        }
+
+        function setWinner(roundIdx, matchIdx, playerNum, predefinedScore = null) {
+            if (!window.canManage) { alert('Solo los organizadores pueden modificar resultados.'); return; }
+            if (!tournament) return;
+
+            const match = tournament.rounds[roundIdx][matchIdx];
+            
+            if (playerNum === 1 && (match.p1.name === 'TBD' || match.p1.name === 'BYE (Pase Libre)')) return;
+            if (playerNum === 2 && (match.p2.name === 'TBD' || match.p2.name === 'BYE (Pase Libre)')) return;
+
+            if (playerNum === 1) {
+                match.winner = match.p1.name;
+                match.p1.score = predefinedScore ? predefinedScore.p1 : Math.max(match.p1.score, 2);
+                match.p2.score = predefinedScore ? predefinedScore.p2 : 0;
+            } else {
+                match.winner = match.p2.name;
+                match.p2.score = predefinedScore ? predefinedScore.p2 : Math.max(match.p2.score, 2);
+                match.p1.score = predefinedScore ? predefinedScore.p1 : 0;
+            }
+
+            propagateWinners();
+            renderBracket();
+            saveToLocalStorage();
+        }
+
+        function setQuickScore(roundIdx, matchIdx, p1Score, p2Score) {
+            if (!window.canManage) { alert('Solo los organizadores pueden modificar marcadores.'); return; }
+            if (!tournament) return;
+            const match = tournament.rounds[roundIdx][matchIdx];
+            
+            match.p1.score = p1Score;
+            match.p2.score = p2Score;
+
+            if (p1Score > p2Score) {
+                match.winner = match.p1.name;
+            } else if (p2Score > p1Score) {
+                match.winner = match.p2.name;
+            } else {
+                match.winner = null;
+            }
+
+            propagateWinners();
+            renderBracket();
+            saveToLocalStorage();
+        }
+
+        function resetBracket() {
+            if (!window.canManage) { alert('Solo los organizadores pueden reiniciar el torneo.'); return; }
+            if (confirm('¿Deseas reiniciar el bracket actual? Se borrarán todos los resultados (los inscritos del evento se mantienen).')) {
+                if (players.length >= 2) {
+                    generateBracket();
+                } else {
+                    tournament = null;
+                    renderBracket();
+                    saveToLocalStorage();
+                }
+            }
+        }
+
+        // --- RENDER BRACKET UI ---
+        function renderBracket() {
+            const container = document.getElementById('bracketContainer');
+            if (!tournament || !tournament.rounds) {
+                container.innerHTML = `
+                    <div class="text-center text-slate-500">
+                        <i class="fa-solid fa-trophy text-5xl mb-3 opacity-30"></i>
+                        <p class="text-sm">No hay enfrentamientos generados aún.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            const bracketFlex = document.createElement('div');
+            bracketFlex.className = 'flex items-start gap-12 py-4 min-w-max';
+
+            // Calcula la posición vertical de cada enfrentamiento para que, ronda
+            // tras ronda, quede centrado respecto a los dos partidos que lo
+            // alimentan (así el bracket se ve alineado en vez de amontonado).
+            const CARD_HEIGHT = window.canManage ? 108 : 72;
+            const CARD_GAP = 16;
+            const UNIT = CARD_HEIGHT + CARD_GAP;
+
+            const positions = [];
+            positions[0] = tournament.rounds[0].map((_, i) => i * UNIT);
+            for (let r = 1; r < tournament.rounds.length; r++) {
+                positions[r] = tournament.rounds[r].map((_, i) => (positions[r - 1][i * 2] + positions[r - 1][i * 2 + 1]) / 2);
+            }
+            const totalHeight = Math.max(...positions[0]) + CARD_HEIGHT;
+
+            tournament.rounds.forEach((roundMatches, rIdx) => {
+                const roundCol = document.createElement('div');
+                roundCol.className = 'flex flex-col';
+
+                const roundHeader = document.createElement('div');
+                roundHeader.className = 'text-center uppercase tracking-widest font-teko text-lg text-amber-400 font-bold mb-2 border-b border-slate-800 pb-1';
+                
+                let title = `Ronda ${rIdx + 1}`;
+                if (rIdx === tournament.rounds.length - 1) title = '🏆 Gran Final';
+                else if (rIdx === tournament.rounds.length - 2) title = 'Semifinal';
+                else if (rIdx === tournament.rounds.length - 3) title = 'Cuartos de Final';
+
+                roundHeader.innerText = title;
+                roundCol.appendChild(roundHeader);
+
+                const matchesStack = document.createElement('div');
+                matchesStack.className = 'relative w-64';
+                matchesStack.style.height = totalHeight + 'px';
+
+                roundMatches.forEach((match, mIdx) => {
+                    const matchCard = document.createElement('div');
+                    matchCard.className = 'absolute left-0 w-64 px-1';
+                    matchCard.style.top = positions[rIdx][mIdx] + 'px';
+
+                    const p1IsWinner = match.winner && match.winner === match.p1.name;
+                    const p2IsWinner = match.winner && match.winner === match.p2.name;
+
+                    const dot = (isWinner, playerNum) => window.canManage
+                        ? `<button onclick="setWinner(${rIdx}, ${mIdx}, ${playerNum})" class="w-2.5 h-2.5 rounded-full shrink-0 transition ${isWinner ? 'bg-amber-400' : 'bg-slate-600 hover:bg-slate-400'}" title="Declarar Ganador"></button>`
+                        : `<span class="w-2.5 h-2.5 rounded-full shrink-0 ${isWinner ? 'bg-amber-400' : 'bg-slate-700'}"></span>`;
+
+                    const scoreEl = (score, isWinner, onchangeExpr) => window.canManage
+                        ? `<input type="number" value="${score}" onchange="${onchangeExpr}" class="w-7 bg-transparent text-center text-xs border-0 focus:outline-none ${isWinner ? 'text-amber-400 font-bold' : 'text-slate-500'}">`
+                        : `<span class="text-xs font-bold w-7 text-center ${isWinner ? 'text-amber-400' : 'text-slate-500'}">${score}</span>`;
+
+                    matchCard.innerHTML = `
+                        <div class="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                            <span class="font-bold">M#${mIdx + 1}</span>
+                            ${window.canManage ? `
+                            <button onclick="openEditModal(${rIdx}, ${mIdx})" class="hover:text-amber-400 transition" title="Editar enfrentamiento">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>` : ''}
+                        </div>
+
+                        <div class="border-l-2 ${match.winner ? 'border-amber-500' : 'border-slate-700'} pl-3">
+                            <!-- Player 1 -->
+                            <div class="flex items-center justify-between py-1.5 border-b border-slate-800">
+                                <div class="flex items-center gap-2 overflow-hidden flex-1">
+                                    ${dot(p1IsWinner, 1)}
+                                    <span class="text-xs truncate ${p1IsWinner ? 'text-amber-300 font-bold' : 'text-slate-300'}">${escapeHtml(match.p1.name)}</span>
+                                </div>
+                                ${scoreEl(match.p1.score, p1IsWinner, `setQuickScore(${rIdx}, ${mIdx}, parseInt(this.value)||0, ${match.p2.score})`)}
+                            </div>
+                            <!-- Player 2 -->
+                            <div class="flex items-center justify-between py-1.5">
+                                <div class="flex items-center gap-2 overflow-hidden flex-1">
+                                    ${dot(p2IsWinner, 2)}
+                                    <span class="text-xs truncate ${p2IsWinner ? 'text-amber-300 font-bold' : 'text-slate-300'}">${escapeHtml(match.p2.name)}</span>
+                                </div>
+                                ${scoreEl(match.p2.score, p2IsWinner, `setQuickScore(${rIdx}, ${mIdx}, ${match.p1.score}, parseInt(this.value)||0)`)}
+                            </div>
+                        </div>
+
+                        ${window.canManage ? `
+                        <div class="flex justify-around text-[10px] mt-1">
+                            <button onclick="setWinner(${rIdx}, ${mIdx}, 1, {p1:2, p2:0})" class="text-slate-500 hover:text-amber-400 font-medium">2-0</button>
+                            <button onclick="setWinner(${rIdx}, ${mIdx}, 1, {p1:2, p2:1})" class="text-slate-500 hover:text-amber-400 font-medium">2-1</button>
+                            <span class="text-slate-700">|</span>
+                            <button onclick="setWinner(${rIdx}, ${mIdx}, 2, {p1:1, p2:2})" class="text-slate-500 hover:text-amber-400 font-medium">1-2</button>
+                            <button onclick="setWinner(${rIdx}, ${mIdx}, 2, {p1:0, p2:2})" class="text-slate-500 hover:text-amber-400 font-medium">0-2</button>
+                        </div>` : ''}
+                    `;
+
+                    matchesStack.appendChild(matchCard);
+                });
+
+                roundCol.appendChild(matchesStack);
+                bracketFlex.appendChild(roundCol);
+            });
+
+            container.appendChild(bracketFlex);
+        }
+
+        // --- EDIT MODAL HANDLERS ---
+        function openEditModal(rIdx, mIdx) {
+            if (!window.canManage) return;
+            editingMatchRef = { rIdx, mIdx };
+            const match = tournament.rounds[rIdx][mIdx];
+
+            document.getElementById('modalP1Name').value = match.p1.name;
+            document.getElementById('modalP1Score').value = match.p1.score;
+            document.getElementById('modalP2Name').value = match.p2.name;
+            document.getElementById('modalP2Score').value = match.p2.score;
+
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            editingMatchRef = null;
+        }
+
+        function saveMatchEdit() {
+            if (!window.canManage || !editingMatchRef || !tournament) return;
+
+            const { rIdx, mIdx } = editingMatchRef;
+            const match = tournament.rounds[rIdx][mIdx];
+
+            match.p1.name = document.getElementById('modalP1Name').value.trim() || 'TBD';
+            match.p1.score = parseInt(document.getElementById('modalP1Score').value) || 0;
+            match.p2.name = document.getElementById('modalP2Name').value.trim() || 'TBD';
+            match.p2.score = parseInt(document.getElementById('modalP2Score').value) || 0;
+
+            if (match.p1.score > match.p2.score) {
+                match.winner = match.p1.name;
+            } else if (match.p2.score > match.p1.score) {
+                match.winner = match.p2.name;
+            } else {
+                match.winner = null;
+            }
+
+            closeEditModal();
+            propagateWinners();
+            renderBracket();
+            saveToLocalStorage();
+        }
+
+        function updateChampionUI() {
+            const banner = document.getElementById('championBanner');
+            const nameEl = document.getElementById('championName');
+
+            if (tournament && tournament.champion) {
+                if (nameEl) nameEl.innerText = tournament.champion;
+                if (banner) banner.classList.remove('hidden');
+                document.getElementById('statStatus').innerText = 'Finalizado';
+            } else {
+                if (banner) banner.classList.add('hidden');
+                if (tournament) document.getElementById('statStatus').innerText = 'En Juego';
+            }
+        }
+
+        // --- LOCAL STORAGE & BACKUP ---
+        function saveToLocalStorage() {
+            const state = { players, tournament, currentEventId };
+            localStorage.setItem('brawlhalla_bracket_data', JSON.stringify(state));
+            if (window.fbPushState) window.fbPushState(players, tournament, currentEventId);
+        }
+
+        function setStateFromRemote(remotePlayers, remoteTournament, remoteEventId) {
+            players = remotePlayers || [];
+            tournament = remoteTournament || null;
+            currentEventId = remoteEventId || null;
+            updatePlayerList();
+            renderBracket();
+            updateChampionUI();
+            updateCurrentEventTitle();
+            localStorage.setItem('brawlhalla_bracket_data', JSON.stringify({ players, tournament, currentEventId }));
+        }
+        window.setStateFromRemote = setStateFromRemote;
+
+        function updateCurrentEventTitle() {
+            const titleEl = document.getElementById('currentEventTitle');
+            if (!titleEl) return;
+            if (currentEventId && window.eventsCache && window.eventsCache[currentEventId]) {
+                titleEl.innerText = window.eventsCache[currentEventId].title || 'Torneo';
+            } else {
+                titleEl.innerText = 'Torneo General';
+            }
+        }
+        window.updateCurrentEventTitle = updateCurrentEventTitle;
+
+        function loadFromLocalStorage() {
+            const raw = localStorage.getItem('brawlhalla_bracket_data');
+            if (raw) {
+                try {
+                    const data = JSON.parse(raw);
+                    players = data.players || [];
+                    tournament = data.tournament || null;
+                    currentEventId = data.currentEventId || null;
+                    if (tournament) {
+                        renderBracket();
+                        updateChampionUI();
+                    }
+                } catch (e) {
+                    console.error('Error loading bracket data', e);
+                }
+            }
+        }
+
+        function exportJSON() {
+            const state = { players, tournament, currentEventId };
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `torneo-brawlhalla-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importJSON() {
+            document.getElementById('importInput').click();
+        }
+
+        function handleFileImport(event) {
+            if (!window.canManage) { alert('Solo los organizadores pueden cargar un backup.'); return; }
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    players = data.players || [];
+                    tournament = data.tournament || null;
+                    currentEventId = data.currentEventId || null;
+                    updatePlayerList();
+                    renderBracket();
+                    updateChampionUI();
+                    saveToLocalStorage();
+                    alert('¡Datos cargados exitosamente!');
+                } catch (err) {
+                    alert('Error al leer el archivo JSON.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+    </script>
+
+    <!-- SCRIPT FIREBASE: AUTENTICACIÓN PERSISTENTE, ROLES (USER, OWNER, ADMIN), GESTIÓN DE EVENTOS & LEADERBOARD -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+        import {
+            getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+            onAuthStateChanged, signOut, setPersistence, browserLocalPersistence,
+            updatePassword
+        } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+        import {
+            getDatabase, ref, set, update, remove, get, onValue, push
+        } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7e7YU_YXrIkDDkAZgHa-EOg6yoPpbw4I",
+            authDomain: "brawlhallatournamets.firebaseapp.com",
+            databaseURL: "https://brawlhallatournamets-default-rtdb.firebaseio.com",
+            projectId: "brawlhallatournamets",
+            storageBucket: "brawlhallatournamets.firebasestorage.app",
+            messagingSenderId: "334204803681",
+            appId: "1:334204803681:web:fc18c91fb41bbc537ce820"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        // PERSISTENCIA DE NAVEGADOR ACTIVADA
+        setPersistence(auth, browserLocalPersistence).catch(err => {
+            console.warn("No se pudo fijar la persistencia de auth:", err);
+        });
+
+        const EMAIL_DOMAIN = '@rbl.local';
+
+        let authMode = 'login';
+        let profile = null;
+        let currentPlayerId = null;
+        let isAdmin = false;
+        let isOwner = false;
+        let eventsCache = {};
+        let playersCache = {};
+
+        function esc(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function slugify(username) {
+            return username.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        }
+
+        function traducirErrorFirebase(code) {
+            const map = {
+                'auth/configuration-not-found': 'Debes activar el proveedor "Correo electrónico/Contraseña" en la consola de Firebase (Authentication -> Sign-in method).',
+                'auth/operation-not-allowed': 'El inicio de sesión con usuario/contraseña está desactivado en la consola de Firebase.',
+                'auth/email-already-in-use': 'Ese nombre de usuario ya está registrado, elige otro.',
+                'auth/invalid-email': 'Ese usuario tiene caracteres inválidos.',
+                'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+                'auth/user-not-found': 'No existe una cuenta con ese usuario.',
+                'auth/wrong-password': 'Contraseña incorrecta.',
+                'auth/invalid-credential': 'Usuario o contraseña incorrectos.',
+                'auth/too-many-requests': 'Demasiados intentos. Intenta de nuevo más tarde.',
+                'auth/requires-recent-login': 'Por seguridad, debes volver a iniciar sesión antes de cambiar tu contraseña.'
+            };
+            return map[code] || ('Error (' + code + '): Revisa los datos ingresados.');
+        }
+
+        // --- AUTH MODAL HANDLERS ---
+        window.openAuthModal = () => document.getElementById('authModal').classList.remove('hidden');
+        window.closeAuthModal = () => {
+            document.getElementById('authModal').classList.add('hidden');
+            document.getElementById('authError').classList.add('hidden');
+        };
+        window.toggleAuthMode = () => {
+            authMode = authMode === 'login' ? 'register' : 'login';
+            document.getElementById('registerFields').classList.toggle('hidden', authMode !== 'register');
+            document.getElementById('authModalTitle').innerText = authMode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta';
+            document.getElementById('btnAuthSubmit').innerText = authMode === 'login' ? 'Entrar' : 'Registrarme';
+            document.getElementById('btnToggleAuthMode').innerText = authMode === 'login' ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión';
+        };
+
+        window.toggleAuthPasswordVisibility = function () {
+            const input = document.getElementById('authPassword');
+            const icon = document.getElementById('authPasswordEyeIcon');
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            icon.classList.toggle('fa-eye', showing);
+            icon.classList.toggle('fa-eye-slash', !showing);
+        };
+
+        function showAuthError(msg) {
+            const el = document.getElementById('authError');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+        }
+
+        window.submitAuth = async function () {
+            const rawUsername = document.getElementById('authUsername').value.trim();
+            const password = document.getElementById('authPassword').value;
+            const playerId = slugify(rawUsername);
+
+            if (!playerId || !password) { showAuthError('Por favor completa el usuario y la contraseña.'); return; }
+
+            try {
+                if (authMode === 'login') {
+                    const cred = await signInWithEmailAndPassword(auth, playerId + EMAIL_DOMAIN, password);
+                    // Forzamos el refresco de identidad aquí mismo (con await) en vez de
+                    // confiar solo en el listener de onAuthStateChanged, que puede tardar
+                    // un instante extra en disparar y dejar la UI con datos viejos/null.
+                    await syncIdentityAndUI(cred.user);
+                } else {
+                    const brawlNick = document.getElementById('regNick').value.trim();
+                    const elo = parseInt(document.getElementById('regElo').value) || 1200;
+                    const rank = document.getElementById('regRank').value;
+                    if (!brawlNick) { showAuthError('Falta tu nick de Brawlhalla.'); return; }
+
+                    const existing = await get(ref(db, 'players/' + playerId));
+                    if (existing.exists()) { showAuthError('Ese nombre de usuario ya está en uso, elige otro.'); return; }
+
+                    // Todo usuario nuevo se crea como jugador normal. Los roles de owner/admin
+                    // se asignan después desde el Panel Admin (o directamente en la consola de
+                    // Firebase para el primer admin) — nunca desde el registro.
+                    const cred = await createUserWithEmailAndPassword(auth, playerId + EMAIL_DOMAIN, password);
+                    await set(ref(db, 'uidToPlayerId/' + cred.user.uid), playerId);
+                    await set(ref(db, 'players/' + playerId), {
+                        username: rawUsername,
+                        brawlNick,
+                        elo,
+                        rank,
+                        role: 'user',
+                        authUid: cred.user.uid,
+                        createdAt: Date.now()
+                    });
+                    // Igual que en login: no esperamos a que onAuthStateChanged reaccione por su
+                    // cuenta. En el registro es donde más importaba, porque ese listener se puede
+                    // disparar ANTES de que 'uidToPlayerId' y 'players' terminen de escribirse,
+                    // dejando currentPlayerId en null (sin botón de inscribirse, sin info de perfil)
+                    // hasta que la persona refrescara la página.
+                    await syncIdentityAndUI(cred.user);
+                }
+                window.closeAuthModal();
+            } catch (err) {
+                console.error("Error Auth:", err);
+                showAuthError(traducirErrorFirebase(err.code));
+            }
+        };
+
+        window.logoutUser = () => signOut(auth);
+
+        // --- AUTH STATE CHANGED OBSERVER ---
+        // Refactorizado a una función nombrada (en vez de un callback anónimo) para poder
+        // llamarla también, de forma explícita y con `await`, justo después de terminar el
+        // registro/login en submitAuth(). Antes solo corría como listener de onAuthStateChanged,
+        // y ese listener podía dispararse ANTES de que 'uidToPlayerId/{uid}' terminara de
+        // escribirse durante el registro (condición de carrera). Resultado: currentPlayerId
+        // quedaba en null para el usuario recién creado y no veía ni el botón de "Inscribirme"
+        // ni su propia info de perfil, hasta refrescar la página.
+        async function syncIdentityAndUI(user) {
+            const btnOpenAuth = document.getElementById('btnOpenAuth');
+            const userChip = document.getElementById('userChip');
+            const navAdmin = document.getElementById('nav-admin');
+            const btnCreateEvent = document.getElementById('btnCreateEvent');
+            const btnImportBackup = document.getElementById('btnImportBackup');
+            const bracketAdminActions = document.getElementById('bracketAdminActions');
+            const bracketRoleHint = document.getElementById('bracketRoleHint');
+
+            if (user) {
+                try {
+                    const mapSnap = await get(ref(db, 'uidToPlayerId/' + user.uid));
+                    currentPlayerId = mapSnap.exists() ? mapSnap.val() : null;
+
+                    if (currentPlayerId) {
+                        const pSnap = await get(ref(db, 'players/' + currentPlayerId));
+                        profile = pSnap.exists() ? pSnap.val() : null;
+                    } else {
+                        profile = null;
+                    }
+                } catch (e) {
+                    console.warn("Error leyendo perfil de usuario:", e);
+                    currentPlayerId = null;
+                    profile = null;
+                }
+
+                // Cuenta "fantasma": el login de Firebase Auth existe, pero su ficha de
+                // jugador (uidToPlayerId/players) ya no está en la base de datos — típicamente
+                // porque se borró el registro desde la base de datos sin borrar también la
+                // cuenta en Firebase Authentication. Sin ficha de jugador no hay nada que
+                // inscribir ni perfil que mostrar, así que cerramos la sesión con un aviso en
+                // vez de dejar a la persona atascada en un estado a medias.
+                if (!currentPlayerId || !profile) {
+                    console.warn('Cuenta sin ficha de jugador asociada (uid: ' + user.uid + '). Cerrando sesión.');
+                    alert('Esta cuenta ya no tiene un perfil de jugador asociado (probablemente fue eliminado desde la base de datos). Vuelve a registrarte para crear uno nuevo.');
+                    await signOut(auth);
+                    return;
+                }
+
+                // Check Admin & Owner Status de manera segura
+                isAdmin = false;
+                isOwner = false;
+
+                try {
+                    const adminSnap = await get(ref(db, 'admins/' + user.uid));
+                    if (adminSnap.exists() && adminSnap.val() === true) isAdmin = true;
+                } catch (e) {
+                    // Ignorar denegación de permisos si no es admin
+                }
+
+                try {
+                    const ownerSnap = await get(ref(db, 'owners/' + user.uid));
+                    if (ownerSnap.exists() && ownerSnap.val() === true) isOwner = true;
+                } catch (e) {
+                    // Ignorar denegación de permisos si no es owner
+                }
+
+                // Fallback desde profile.role
+                if (profile && profile.role === 'admin') isAdmin = true;
+                if (profile && profile.role === 'owner') isOwner = true;
+
+                const canManage = isAdmin || isOwner;
+                window.canManage = canManage;
+                window.isAdmin = isAdmin;
+
+                // Antes esto solo se pintaba cuando cambiaban los datos de 'players' en
+                // Firebase, así que si ya habían cargado antes de iniciar sesión, el admin
+                // veía la tabla vacía. Ahora se repinta también aquí, apenas se confirma el rol.
+                if (isAdmin) renderAdminPanel();
+
+                btnOpenAuth.classList.add('hidden');
+                userChip.classList.remove('hidden');
+                userChip.classList.add('flex');
+
+                document.getElementById('userChipName').innerText = profile ? profile.brawlNick : (currentPlayerId || user.email);
+                document.getElementById('userChipElo').innerText = profile ? (profile.elo + ' ELO · ' + profile.rank) : '';
+                
+                const roleBadge = document.getElementById('userRoleBadge');
+                if (isAdmin) {
+                    roleBadge.innerText = 'Admin';
+                    roleBadge.className = 'px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-amber-500 text-slate-950';
+                } else if (isOwner) {
+                    roleBadge.innerText = 'Partner';
+                    roleBadge.className = 'px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-purple-500 text-white';
+                } else {
+                    roleBadge.innerText = 'Jugador';
+                    roleBadge.className = 'px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-slate-300';
+                }
+
+                if (navAdmin) navAdmin.classList.toggle('hidden', !isAdmin);
+                if (btnCreateEvent) btnCreateEvent.classList.toggle('hidden', !canManage);
+                if (btnImportBackup) btnImportBackup.classList.toggle('hidden', !canManage);
+
+                // Show/Hide Bracket Admin Controls
+                if (bracketAdminActions) bracketAdminActions.classList.toggle('hidden', !canManage);
+                if (bracketRoleHint) {
+                    bracketRoleHint.innerText = canManage 
+                        ? 'Modo Organizador: elige un evento en "Eventos" y pulsa Iniciar Torneo para generar el bracket automáticamente.' 
+                        : 'Modo Espectador: Visualización en tiempo real.';
+                }
+
+            } else {
+                profile = null;
+                currentPlayerId = null;
+                isAdmin = false;
+                isOwner = false;
+                window.canManage = false;
+                window.isAdmin = false;
+
+                btnOpenAuth.classList.remove('hidden');
+                userChip.classList.add('hidden');
+                userChip.classList.remove('flex');
+
+                if (navAdmin) navAdmin.classList.add('hidden');
+                if (btnCreateEvent) btnCreateEvent.classList.add('hidden');
+                if (btnImportBackup) btnImportBackup.classList.add('hidden');
+                if (bracketAdminActions) bracketAdminActions.classList.add('hidden');
+                if (bracketRoleHint) bracketRoleHint.innerText = 'Modo Espectador: Visualización en tiempo real.';
+            }
+
+            renderEventsList();
+            renderBracket();
+            updatePlayerList();
+        }
+
+        onAuthStateChanged(auth, syncIdentityAndUI);
+
+        // --- PROFILE EDITING & SETTINGS ---
+        window.openMyProfile = function () {
+            if (!currentPlayerId || !profile) return;
+            const statusMsg = document.getElementById('profStatusMsg');
+            if (statusMsg) statusMsg.classList.add('hidden');
+
+            document.getElementById('profNick').value = profile.brawlNick || '';
+            document.getElementById('profElo').value = profile.elo || 0;
+            document.getElementById('profRank').value = profile.rank || 'Gold';
+            document.getElementById('profLegend').value = profile.legend || '';
+
+            document.getElementById('profInfoUsername').innerText = profile.username || currentPlayerId;
+            const roleName = profile.role === 'admin' ? 'Administrador' : (profile.role === 'owner' ? 'Partner / Owner' : 'Jugador');
+            document.getElementById('profInfoRole').innerText = roleName;
+            document.getElementById('profInfoUid').innerText = auth.currentUser ? auth.currentUser.uid : '-';
+
+            document.getElementById('profNewPass').value = '';
+            document.getElementById('profConfirmPass').value = '';
+
+            document.getElementById('myProfileModal').classList.remove('hidden');
+        };
+        window.closeMyProfile = () => document.getElementById('myProfileModal').classList.add('hidden');
+
+        function showProfStatus(msg, isSuccess = true) {
+            const statusMsg = document.getElementById('profStatusMsg');
+            if (!statusMsg) return;
+            statusMsg.innerText = msg;
+            statusMsg.className = `text-xs rounded-lg p-2.5 ${isSuccess ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800' : 'bg-red-950/60 text-red-300 border border-red-800'}`;
+            statusMsg.classList.remove('hidden');
+        }
+
+        window.saveMyProfile = async function () {
+            if (!currentPlayerId) return;
+            const brawlNick = document.getElementById('profNick').value.trim();
+            const elo = parseInt(document.getElementById('profElo').value) || 0;
+            const rank = document.getElementById('profRank').value;
+            const legend = document.getElementById('profLegend').value.trim();
+            
+            if (!brawlNick) { showProfStatus('Tu nick de Brawlhalla no puede quedar vacío.', false); return; }
+            try {
+                await update(ref(db, 'players/' + currentPlayerId), { brawlNick, elo, rank, legend });
+                profile.brawlNick = brawlNick; 
+                profile.elo = elo; 
+                profile.rank = rank;
+                profile.legend = legend;
+
+                document.getElementById('userChipName').innerText = brawlNick;
+                document.getElementById('userChipElo').innerText = elo + ' ELO · ' + rank;
+                showProfStatus('¡Perfil actualizado con éxito!', true);
+            } catch (err) {
+                showProfStatus('No se pudo guardar: ' + err.message, false);
+            }
+        };
+
+        window.changeMyPassword = async function () {
+            const newPass = document.getElementById('profNewPass').value;
+            const confirmPass = document.getElementById('profConfirmPass').value;
+
+            if (!newPass || newPass.length < 6) {
+                showProfStatus('La nueva contraseña debe tener al menos 6 caracteres.', false);
+                return;
+            }
+            if (newPass !== confirmPass) {
+                showProfStatus('Las contraseñas no coinciden.', false);
+                return;
+            }
+
+            try {
+                await updatePassword(auth.currentUser, newPass);
+                document.getElementById('profNewPass').value = '';
+                document.getElementById('profConfirmPass').value = '';
+                showProfStatus('¡Contraseña actualizada correctamente!', true);
+            } catch (err) {
+                console.error("Error al cambiar contraseña:", err);
+                showProfStatus(traducirErrorFirebase(err.code), false);
+            }
+        };
+
+        // --- ADMIN PANEL & ROLE ASSIGNMENT ---
+        onValue(ref(db, 'players'), (snap) => {
+            playersCache = snap.exists() ? snap.val() : {};
+            window.playersCache = playersCache;
+            if (isAdmin) renderAdminPanel();
+        });
+
+        function renderAdminPanel() {
+            const tbody = document.getElementById('adminUsersList');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            Object.entries(playersCache).forEach(([pid, p]) => {
+                const tr = document.createElement('tr');
+                const currentRole = p.role || 'user';
+                
+                let rowBg = 'border-b border-slate-800 hover:bg-slate-800/40';
+                if (currentRole === 'admin') rowBg = 'border-b border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20';
+                else if (currentRole === 'owner') rowBg = 'border-b border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20';
+
+                tr.className = rowBg;
+
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-slate-100">
+                        <div class="flex items-center gap-2">
+                            ${currentRole === 'admin' ? '<span title="Super Admin">🛡️</span>' : (currentRole === 'owner' ? '<span title="Owner/Organizador">👑</span>' : '<span class="text-slate-500">🎮</span>')}
+                            <input type="text" value="${esc(p.brawlNick || '')}" data-field="brawlNick" class="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-100 font-bold">
+                        </div>
+                    </td>
+                    <td class="p-3 text-slate-400">${esc(p.username || pid)}</td>
+                    <td class="p-3"><input type="text" value="${esc(p.legend || '')}" data-field="legend" placeholder="—" class="w-24 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-100"></td>
+                    <td class="p-3"><input type="number" value="${p.elo || 0}" data-field="elo" class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-100"></td>
+                    <td class="p-3">
+                        <select data-field="rank" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-100">
+                            ${['Tin', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Valhallan'].map(r => `<option ${p.rank === r ? 'selected' : ''}>${r}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td class="p-3">
+                        <select data-field="role" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs font-semibold ${currentRole === 'admin' ? 'text-amber-400 font-bold' : (currentRole === 'owner' ? 'text-purple-400 font-bold' : 'text-slate-300')}">
+                            <option value="user" ${currentRole === 'user' ? 'selected' : ''}>Jugador Normal</option>
+                            <option value="owner" ${currentRole === 'owner' ? 'selected' : ''}>Partner / Owner (Organizador)</option>
+                            <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>Administrador (Acceso Total)</option>
+                        </select>
+                    </td>
+                    <td class="p-3 text-center flex justify-center gap-3">
+                        <button onclick="saveAdminUserRow('${pid}', this)" class="text-cyan-400 hover:text-cyan-300 font-bold text-sm" title="Guardar Cambios"><i class="fa-solid fa-floppy-disk"></i></button>
+                        <button onclick="deletePlayer('${pid}')" class="text-slate-500 hover:text-red-400 font-bold text-sm" title="Eliminar Jugador"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        window.renderAdminPanel = renderAdminPanel;
+
+        window.saveAdminUserRow = async function (pid, btn) {
+            if (!isAdmin) return;
+            const row = btn.closest('tr');
+            const brawlNick = row.querySelector('[data-field="brawlNick"]').value.trim();
+            const legend = row.querySelector('[data-field="legend"]').value.trim();
+            const elo = parseInt(row.querySelector('[data-field="elo"]').value) || 0;
+            const rank = row.querySelector('[data-field="rank"]').value;
+            const newRole = row.querySelector('[data-field="role"]').value;
+            const targetPlayer = playersCache[pid];
+
+            if (!brawlNick) { alert('El nick de Brawlhalla no puede quedar vacío.'); return; }
+
+            try {
+                await update(ref(db, 'players/' + pid), { brawlNick, legend, elo, rank, role: newRole });
+
+                if (targetPlayer && targetPlayer.authUid) {
+                    const uid = targetPlayer.authUid;
+                    await set(ref(db, 'admins/' + uid), newRole === 'admin' ? true : null);
+                    await set(ref(db, 'owners/' + uid), (newRole === 'owner' || newRole === 'admin') ? true : null);
+                }
+                alert('Usuario actualizado correctamente.');
+            } catch (err) {
+                alert('Error al guardar: ' + err.message);
+            }
+        };
+
+        window.deletePlayer = async function (pid) {
+            if (!isAdmin) return;
+            if (!confirm('¿Eliminar a este jugador? Se borra permanentemente.')) return;
+            await remove(ref(db, 'players/' + pid));
+        };
+
+        // --- LEADERBOARD RENDER ---
+        window.renderLeaderboard = function () {
+            const tbody = document.getElementById('leaderboardTbody');
+            const searchVal = (document.getElementById('searchLeaderboard')?.value || '').toLowerCase();
+            if (!tbody) return;
+
+            const list = Object.values(playersCache);
+            list.sort((a, b) => (b.elo || 0) - (a.elo || 0));
+
+            const filtered = list.filter(p => 
+                (p.brawlNick || '').toLowerCase().includes(searchVal) || 
+                (p.username || '').toLowerCase().includes(searchVal)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-500">No se encontraron jugadores.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((p, idx) => {
+                const r = p.role || 'user';
+                const roleBadge = r === 'admin' ? '<span class="text-amber-400 font-bold">Admin</span>' 
+                    : (r === 'owner' ? '<span class="text-purple-400 font-bold">Partner</span>' : '<span class="text-slate-400">Jugador</span>');
+
+                return `
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+                        <td class="p-3 font-bold ${idx === 0 ? 'text-amber-400' : (idx === 1 ? 'text-slate-300' : (idx === 2 ? 'text-amber-600' : 'text-slate-500'))}">#${idx + 1}</td>
+                        <td class="p-3 font-bold text-slate-100">${esc(p.brawlNick || '')}</td>
+                        <td class="p-3 text-slate-400">${esc(p.username || '')}</td>
+                        <td class="p-3 text-amber-300 font-bold">${p.elo || 1200} ELO</td>
+                        <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-semibold text-slate-300">${p.rank || 'Gold'}</span></td>
+                        <td class="p-3">${roleBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        // --- EVENTS MANAGEMENT ---
+        onValue(ref(db, 'events'), (snap) => {
+            eventsCache = snap.exists() ? snap.val() : {};
+            window.eventsCache = eventsCache;
+            renderEventsList();
+            if (typeof updateCurrentEventTitle === 'function') updateCurrentEventTitle();
+        });
+
+        const statusLabels = { abierto: 'Abierto', iniciado: 'En Juego', finalizado: 'Finalizado' };
+
+        function renderEventsList() {
+            const container = document.getElementById('eventsList');
+            if (!container) return;
+
+            const ids = Object.keys(eventsCache);
+            if (ids.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 col-span-full text-center py-8">No hay eventos activos programados.</p>';
+                return;
+            }
+            ids.sort((a, b) => (eventsCache[a].startDate || '').localeCompare(eventsCache[b].startDate || ''));
+            const typeLabels = { '1v1': '1v1', '2v2': 'Dúos (2v2)', '3v3': 'Tríos (3v3)', 'ffa': 'Todos contra todos' };
+
+            container.innerHTML = ids.map(id => {
+                const ev = eventsCache[id];
+                const participants = ev.participants || {};
+                const count = Object.keys(participants).length;
+                const joined = currentPlayerId && participants[currentPlayerId];
+                const canEditEvent = isAdmin || (isOwner && ev.createdBy === currentPlayerId);
+                const status = ev.status || 'abierto';
+                const isStarted = status !== 'abierto';
+
+                const statusBadgeClass = status === 'iniciado' ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                    : (status === 'finalizado' ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-cyan-950 text-cyan-400 border-cyan-800');
+
+                return `
+                    <div class="bg-slate-900/70 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition shadow-lg">
+                        <div>
+                            <div class="flex justify-between items-start gap-2 mb-2">
+                                <h4 class="font-teko text-2xl text-amber-300 leading-none">${esc(ev.title || '')}</h4>
+                                <span class="text-[10px] uppercase font-bold border px-2 py-0.5 rounded-full shrink-0 ${statusBadgeClass}">${statusLabels[status] || status}</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mb-1"><span class="text-[10px] uppercase font-bold bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded mr-1">${typeLabels[ev.type] || ev.type}</span></p>
+                            <p class="text-xs text-slate-300 mb-3 leading-relaxed">${esc(ev.description || '')}</p>
+                            ${ev.prize ? `<p class="text-xs text-amber-400 font-bold mb-2"><i class="fa-solid fa-gift"></i> Premio: ${esc(ev.prize)}</p>` : ''}
+                            <div class="text-[11px] text-slate-400 space-y-1 mb-4">
+                                <p><i class="fa-solid fa-calendar text-slate-500 mr-1"></i> Inicio: ${ev.startDate || '?'} (${ev.durationDays || 1} día/s)</p>
+                                <p><i class="fa-solid fa-users text-slate-500 mr-1"></i> Inscritos: <span class="font-bold text-amber-400">${count}</span></p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 flex-wrap border-t border-slate-800 pt-3">
+                            ${currentPlayerId && !isStarted ? `<button onclick="toggleJoinEvent('${id}')" class="text-xs font-bold px-3 py-1.5 rounded-lg transition ${joined ? 'bg-red-950/50 text-red-300 border border-red-800' : 'bg-cyan-600 hover:bg-cyan-500 text-white'}">${joined ? 'Salir del Evento' : 'Inscribirme'}</button>` : ''}
+                            ${currentPlayerId && isStarted ? `<span class="text-[11px] text-slate-500 italic px-1 py-1.5">Inscripciones cerradas</span>` : ''}
+                            ${window.canManage && !isStarted ? `<button onclick="startTournamentFromEvent('${id}')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 transition"><i class="fa-solid fa-rocket"></i> Iniciar Torneo</button>` : ''}
+                            ${window.canManage && isStarted ? `<button onclick="viewEventBracket('${id}')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 transition"><i class="fa-solid fa-sitemap"></i> Ver Bracket</button>` : ''}
+                            ${canEditEvent ? `<button onclick="deleteEvent('${id}')" class="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition" title="Eliminar Evento"><i class="fa-solid fa-trash"></i></button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.toggleJoinEvent = async function (eventId) {
+            if (!currentPlayerId || !profile) return;
+            const pRef = ref(db, `events/${eventId}/participants/${currentPlayerId}`);
+            const already = eventsCache[eventId] && eventsCache[eventId].participants && eventsCache[eventId].participants[currentPlayerId];
+            try {
+                if (already) await remove(pRef);
+                else await set(pRef, { name: profile.username, brawlNick: profile.brawlNick });
+            } catch (err) {
+                console.error('Error al inscribirse/salir del evento:', err);
+                alert('No se pudo actualizar tu inscripción: ' + err.message);
+            }
+        };
+
+        window.deleteEvent = async function (eventId) {
+            if (!window.canManage) return;
+            if (!confirm('¿Eliminar este evento por completo?')) return;
+            await remove(ref(db, 'events/' + eventId));
+        };
+
+        // El bracket ya no se arma con una lista manual: al iniciar el torneo se toman
+        // automáticamente todos los inscritos del evento, sembrados por ELO (mayor a
+        // menor) usando el ELO guardado en players/, y el evento pasa a estado
+        // "iniciado" para cerrar inscripciones.
+        window.startTournamentFromEvent = async function (eventId) {
+            if (!window.canManage) return;
+            const ev = eventsCache[eventId];
+            const parts = ev && ev.participants;
+            if (!parts || Object.keys(parts).length < 2) { alert('Este evento necesita al menos 2 inscritos para iniciar el torneo.'); return; }
+            if ((ev.status || 'abierto') !== 'abierto') { alert('Este torneo ya fue iniciado.'); return; }
+
+            if (!confirm(`Se generará el bracket de "${ev.title}" con ${Object.keys(parts).length} inscritos y se cerrarán las inscripciones. ¿Continuar?`)) return;
+
+            const seeded = Object.entries(parts)
+                .map(([pid, p]) => ({ name: p.brawlNick || p.name, elo: (playersCache[pid] && playersCache[pid].elo) || 1200 }))
+                .sort((a, b) => b.elo - a.elo)
+                .map(p => p.name);
+
+            currentEventId = eventId;
+            window.setPlayersFromEvent(seeded);
+            generateBracket();
+
+            try {
+                await update(ref(db, 'events/' + eventId), { status: 'iniciado' });
+            } catch (err) {
+                console.warn('No se pudo actualizar el estado del evento:', err.message);
+            }
+        };
+
+        window.viewEventBracket = function (eventId) {
+            currentEventId = eventId;
+            updateCurrentEventTitle();
+            saveToLocalStorage();
+            switchTab('bracket');
+        };
+
+        function setPlayersFromEvent(names) {
+            players = names.slice();
+            updatePlayerList();
+            switchTab('bracket');
+        }
+        window.setPlayersFromEvent = setPlayersFromEvent;
+
+        window.openCreateEventModal = function () {
+            if (!window.canManage) return;
+            let latestEnd = null;
+            Object.values(eventsCache).forEach(ev => {
+                if (!ev.startDate) return;
+                const start = new Date(ev.startDate + 'T00:00:00');
+                const end = new Date(start.getTime() + (ev.durationDays || 1) * 86400000);
+                if (!latestEnd || end > latestEnd) latestEnd = end;
+            });
+            const suggested = latestEnd ? new Date(latestEnd.getTime() + 86400000) : new Date();
+            document.getElementById('evStartDate').value = suggested.toISOString().slice(0, 10);
+            document.getElementById('evTitle').value = '';
+            document.getElementById('evDescription').value = '';
+            document.getElementById('evPrize').value = '';
+            document.getElementById('evDuration').value = 1;
+            document.getElementById('eventModal').classList.remove('hidden');
+        };
+        window.closeCreateEventModal = () => document.getElementById('eventModal').classList.add('hidden');
+
+        window.saveEvent = async function () {
+            if (!window.canManage) return;
+            const title = document.getElementById('evTitle').value.trim();
+            if (!title) { alert('Ingresa un título para el evento.'); return; }
+            const newRef = push(ref(db, 'events'));
+            await set(newRef, {
+                title,
+                type: document.getElementById('evType').value,
+                description: document.getElementById('evDescription').value.trim(),
+                prize: document.getElementById('evPrize').value.trim(),
+                startDate: document.getElementById('evStartDate').value,
+                durationDays: parseInt(document.getElementById('evDuration').value) || 1,
+                status: 'abierto',
+                createdBy: currentPlayerId,
+                createdAt: Date.now(),
+                participants: {}
+            });
+            window.closeCreateEventModal();
+        };
+
+        // --- REAL-TIME LIVE BRACKET SYNC ---
+        let applyingRemote = false;
+        onValue(ref(db, 'liveTournament'), (snap) => {
+            const data = snap.exists() ? snap.val() : null;
+            applyingRemote = true;
+            window.setStateFromRemote((data && data.players) || [], (data && data.tournament) || null, (data && data.currentEventId) || null);
+            applyingRemote = false;
+        });
+
+        window.fbPushState = function (playersState, tournamentState, eventIdState) {
+            if (applyingRemote || !window.canManage) return;
+            set(ref(db, 'liveTournament'), { players: playersState || [], tournament: tournamentState || null, currentEventId: eventIdState || null })
+                .catch(err => console.warn('No se pudo sincronizar el bracket en Firebase:', err.message));
+        };
+    </script>
+</body>
+</html>

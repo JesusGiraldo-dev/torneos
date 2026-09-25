@@ -752,28 +752,29 @@
 
             container.innerHTML = '';
             const bracketFlex = document.createElement('div');
-            bracketFlex.className = 'flex items-start gap-12 py-4 min-w-max';
+            bracketFlex.className = 'flex items-stretch gap-12 py-4 min-w-max';
 
-            // Calcula la posición vertical de cada enfrentamiento para que, ronda
-            // tras ronda, quede centrado respecto a los dos partidos que lo
-            // alimentan (así el bracket se ve alineado en vez de amontonado).
-            const CARD_HEIGHT = window.canManage ? 108 : 72;
-            const CARD_GAP = 16;
-            const UNIT = CARD_HEIGHT + CARD_GAP;
-
-            const positions = [];
-            positions[0] = tournament.rounds[0].map((_, i) => i * UNIT);
-            for (let r = 1; r < tournament.rounds.length; r++) {
-                positions[r] = tournament.rounds[r].map((_, i) => (positions[r - 1][i * 2] + positions[r - 1][i * 2 + 1]) / 2);
-            }
-            const totalHeight = Math.max(...positions[0]) + CARD_HEIGHT;
+            // Layout con flexbox anidado en vez de posicionamiento absoluto con
+            // matemática de píxeles a mano. Antes cada tarjeta se ubicaba con un
+            // "top" calculado asumiendo una altura fija (CARD_HEIGHT); si el
+            // contenido real medía distinto (fuente aún no cargada, nombres largos,
+            // zoom del navegador, etc.) las tarjetas quedaban desalineadas o
+            // encimadas ("se dañaba" el bracket). Ahora cada enfrentamiento vive
+            // dentro de un "slot" flex cuyo flex-grow es proporcional a cuántos
+            // enfrentamientos de la Ronda 1 lo alimentan (2^ronda), y el navegador
+            // se encarga de centrar todo automáticamente: siempre queda alineado,
+            // sin importar el tamaño real de cada tarjeta.
+            const ROW_MIN_HEIGHT = window.canManage ? 128 : 88;
+            const containerMinHeight = tournament.rounds[0].length * ROW_MIN_HEIGHT;
+            bracketFlex.style.minHeight = containerMinHeight + 'px';
 
             tournament.rounds.forEach((roundMatches, rIdx) => {
                 const roundCol = document.createElement('div');
                 roundCol.className = 'flex flex-col';
+                roundCol.style.flex = '1 1 0px';
 
                 const roundHeader = document.createElement('div');
-                roundHeader.className = 'text-center uppercase tracking-widest font-teko text-lg text-amber-400 font-bold mb-2 border-b border-slate-800 pb-1';
+                roundHeader.className = 'text-center uppercase tracking-widest font-teko text-lg text-amber-400 font-bold mb-2 border-b border-slate-800 pb-1 shrink-0';
                 
                 let title = `Ronda ${rIdx + 1}`;
                 if (rIdx === tournament.rounds.length - 1) title = '🏆 Gran Final';
@@ -784,13 +785,21 @@
                 roundCol.appendChild(roundHeader);
 
                 const matchesStack = document.createElement('div');
-                matchesStack.className = 'relative w-64';
-                matchesStack.style.height = totalHeight + 'px';
+                matchesStack.className = 'flex flex-col w-64';
+                matchesStack.style.flex = '1 1 0px';
+
+                // Cada slot ocupa un espacio proporcional a 2^rIdx unidades, igual
+                // que la cantidad de enfrentamientos de la Ronda 1 que desembocan en
+                // él, así que siempre queda centrado entre sus dos partidos previos.
+                const slotGrow = Math.pow(2, rIdx);
 
                 roundMatches.forEach((match, mIdx) => {
+                    const matchSlot = document.createElement('div');
+                    matchSlot.className = 'flex flex-col justify-center px-1';
+                    matchSlot.style.flex = `${slotGrow} 0 0`;
+
                     const matchCard = document.createElement('div');
-                    matchCard.className = 'absolute left-0 w-64 px-1';
-                    matchCard.style.top = positions[rIdx][mIdx] + 'px';
+                    matchCard.className = 'w-full';
 
                     const p1IsWinner = match.winner && match.winner === match.p1.name;
                     const p2IsWinner = match.winner && match.winner === match.p2.name;
@@ -1149,13 +1158,6 @@
         window.logoutUser = () => signOut(auth);
 
         // --- AUTH STATE CHANGED OBSERVER ---
-        // Refactorizado a una función nombrada (en vez de un callback anónimo) para poder
-        // llamarla también, de forma explícita y con `await`, justo después de terminar el
-        // registro/login en submitAuth(). Antes solo corría como listener de onAuthStateChanged,
-        // y ese listener podía dispararse ANTES de que 'uidToPlayerId/{uid}' terminara de
-        // escribirse durante el registro (condición de carrera). Resultado: currentPlayerId
-        // quedaba en null para el usuario recién creado y no veía ni el botón de "Inscribirme"
-        // ni su propia info de perfil, hasta refrescar la página.
         async function syncIdentityAndUI(user) {
             const btnOpenAuth = document.getElementById('btnOpenAuth');
             const userChip = document.getElementById('userChip');
@@ -1182,12 +1184,6 @@
                     profile = null;
                 }
 
-                // Cuenta "fantasma": el login de Firebase Auth existe, pero su ficha de
-                // jugador (uidToPlayerId/players) ya no está en la base de datos — típicamente
-                // porque se borró el registro desde la base de datos sin borrar también la
-                // cuenta en Firebase Authentication. Sin ficha de jugador no hay nada que
-                // inscribir ni perfil que mostrar, así que cerramos la sesión con un aviso en
-                // vez de dejar a la persona atascada en un estado a medias.
                 if (!currentPlayerId || !profile) {
                     console.warn('Cuenta sin ficha de jugador asociada (uid: ' + user.uid + '). Cerrando sesión.');
                     alert('Esta cuenta ya no tiene un perfil de jugador asociado (probablemente fue eliminado desde la base de datos). Vuelve a registrarte para crear uno nuevo.');
@@ -1195,25 +1191,19 @@
                     return;
                 }
 
-                // Check Admin & Owner Status de manera segura
                 isAdmin = false;
                 isOwner = false;
 
                 try {
                     const adminSnap = await get(ref(db, 'admins/' + user.uid));
                     if (adminSnap.exists() && adminSnap.val() === true) isAdmin = true;
-                } catch (e) {
-                    // Ignorar denegación de permisos si no es admin
-                }
+                } catch (e) {}
 
                 try {
                     const ownerSnap = await get(ref(db, 'owners/' + user.uid));
                     if (ownerSnap.exists() && ownerSnap.val() === true) isOwner = true;
-                } catch (e) {
-                    // Ignorar denegación de permisos si no es owner
-                }
+                } catch (e) {}
 
-                // Fallback desde profile.role
                 if (profile && profile.role === 'admin') isAdmin = true;
                 if (profile && profile.role === 'owner') isOwner = true;
 
@@ -1221,9 +1211,6 @@
                 window.canManage = canManage;
                 window.isAdmin = isAdmin;
 
-                // Antes esto solo se pintaba cuando cambiaban los datos de 'players' en
-                // Firebase, así que si ya habían cargado antes de iniciar sesión, el admin
-                // veía la tabla vacía. Ahora se repinta también aquí, apenas se confirma el rol.
                 if (isAdmin) renderAdminPanel();
 
                 btnOpenAuth.classList.add('hidden');
@@ -1249,7 +1236,6 @@
                 if (btnCreateEvent) btnCreateEvent.classList.toggle('hidden', !canManage);
                 if (btnImportBackup) btnImportBackup.classList.toggle('hidden', !canManage);
 
-                // Show/Hide Bracket Admin Controls
                 if (bracketAdminActions) bracketAdminActions.classList.toggle('hidden', !canManage);
                 if (bracketRoleHint) {
                     bracketRoleHint.innerText = canManage 
@@ -1565,10 +1551,6 @@
             await remove(ref(db, 'events/' + eventId));
         };
 
-        // El bracket ya no se arma con una lista manual: al iniciar el torneo se toman
-        // automáticamente todos los inscritos del evento, sembrados por ELO (mayor a
-        // menor) usando el ELO guardado en players/, y el evento pasa a estado
-        // "iniciado" para cerrar inscripciones.
         window.startTournamentFromEvent = async function (eventId) {
             if (!window.canManage) return;
             const ev = eventsCache[eventId];
